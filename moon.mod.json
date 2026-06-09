@@ -8,7 +8,7 @@
     "conglinyizhi/moon-embed": "0.1.2"
   },
   "repository": "https://github.com/conglinyizhi/prompts-server",
-  "license": "AGPL-3.0",
+  "license": "MIT",
   "keywords": [],
   "description": "",
   "preferred-target": "native"
