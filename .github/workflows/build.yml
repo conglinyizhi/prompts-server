@@ -50,8 +50,10 @@ jobs:
             echo ']'
           } > embedded.mbt
 
-      - name: Build backend (release)
-        run: moon build --release
+      - name: Update registry and build
+        run: |
+          moon update
+          moon build --release
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
