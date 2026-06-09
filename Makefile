@@ -1,6 +1,6 @@
 .PHONY: dev backend frontend build build-backend build-frontend install check clean nuke kill embed
 
-BACKEND_BIN  := _build/native/debug/build/prompts-server.exe
+BACKEND_BIN  := _build/native/release/build/prompts-server.exe
 FRONTEND_DIR := frontend
 
 # ── 安装依赖 ────────────────────────────────────────────────
@@ -41,8 +41,8 @@ embed:
 	} > embedded.mbt
 
 build-backend:
-	@echo "[backend] moon build --target native"
-	@moon build --target native
+	@echo "[backend] moon build --release"
+	@moon build --release
 
 # ── 开发：同时启动前后端 ────────────────────────────────────
 dev: kill
