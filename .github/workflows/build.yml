@@ -1,0 +1,59 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MoonBit
+        run: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+
+      - name: Setup PATH
+        run: echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          pnpm install
+          pnpm build
+
+      - name: Generate embedded files
+        run: |
+          {
+            echo 'pub let emb_paths : Array[String] = ['
+            find frontend/dist -type f | sort | while read f; do
+              path="/${f#frontend/dist/}"
+              echo "  \"$path\","
+            done
+            echo ']'
+            echo ''
+            echo 'pub let emb_data : Array[String] = ['
+            find frontend/dist -type f | sort | while read f; do
+              b64=$(base64 -w0 < "$f")
+              echo "  \"$b64\","
+            done
+            echo ']'
+          } > embedded.mbt
+
+      - name: Build backend
+        run: moon build --target native
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: prompts-server
+          path: _build/native/debug/build/prompts-server.exe

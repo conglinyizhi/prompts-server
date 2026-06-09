@@ -25,7 +25,20 @@ build-frontend: install
 # 将 frontend/dist/ 嵌入为 embedded.mbt
 embed:
 	@echo "[embed] Generating embedded.mbt…"
-	@bash scripts/embed.sh
+	@{ \
+	  echo 'pub let emb_paths : Array[String] = ['; \
+	  find frontend/dist -type f | sort | while read f; do \
+	    echo "  \"/$${f#frontend/dist/}\","; \
+	  done; \
+	  echo ']'; \
+	  echo ''; \
+	  echo 'pub let emb_data : Array[String] = ['; \
+	  find frontend/dist -type f | sort | while read f; do \
+	    b64=$$(base64 -w0 < "$$f" 2>/dev/null || base64 < "$$f" | tr -d '\n'); \
+	    echo "  \"$$b64\","; \
+	  done; \
+	  echo ']'; \
+	} > embedded.mbt
 
 build-backend:
 	@echo "[backend] moon build --target native"
