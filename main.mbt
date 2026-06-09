@@ -266,40 +266,18 @@ async fn handle_health(sconn : @http.ServerConnection) -> Unit {
   send_json(sconn, 200, "{\"status\":\"ok\"}")
 }
 
-// ===== 嵌入式静态文件服务 =====
-
-fn guess_type(path : StringView) -> String {
-  let len = path.length()
-  if len >= 5 { let end = path[len - 5:]; if end == ".html" { return "text/html; charset=utf-8" } }
-  if len >= 4 { let end = path[len - 4:]; if end == ".css" { return "text/css; charset=utf-8" } }
-  if len >= 3 { let end = path[len - 3:]; if end == ".js" { return "application/javascript; charset=utf-8" } }
-  if len >= 4 { let end = path[len - 4:]; if end == ".svg" { return "image/svg+xml" } }
-  if len >= 4 { let end = path[len - 4:]; if end == ".png" { return "image/png" } }
-  if len >= 4 { let end = path[len - 4:]; if end == ".ico" { return "image/x-icon" } }
-  if len >= 5 { let end = path[len - 5:]; if end == ".json" { return "application/json" } }
-  "application/octet-stream"
-}
-
-fn resolve_path(path : StringView) -> StringView {
-  // 根路径映射到 /index.html
-  if path == "/" { return "/index.html" }
-  // 以 / 结尾的映射到 index.html
-  let len = path.length()
-  if len > 1 && path[len - 1] == '/' { return path[:len - 1] + "/index.html" }
-  path
-}
-
 // ===== 主入口 =====
 
 async fn main {
   let db = init_db()
   let vec = @env.get_env_var("EMBEDDING_API_KEY") is Some(_)
-  let file_count = emb_paths.length()
+  let embedded = @embed.decode_all(emb_paths, emb_data)
+  @embed.ensure_embedded(emb_paths) |> ignore
   @stdio.stdout.write(
     "Prompts Server running on http://" + host + "\n" +
     "  DB: " + db_file + "\n" +
     "  Embedding: " + (if vec { "enabled" } else { "disabled" }) + "\n" +
-    "  Embedded: " + file_count.to_string() + " static files\n" +
+    "  Embedded: " + embedded.keys().length().to_string() + " static files\n" +
     "  POST /api/prompts        - create\n" +
     "  GET  /api/prompts         - recent " + recent_limit.to_string() + "\n" +
     "  GET  /api/prompts/search  - search\n" +
@@ -318,24 +296,22 @@ async fn main {
         (Get, "/api/prompts") | (Get, "/api/prompts/recent") => handle_recent(db, sconn)
         (Get, "/api/prompts/search") => handle_search(db, request.path, sconn)
         (Get, "/api/prompts/content") => handle_content(db, request.path, sconn)
+        // 所有未匹配的 GET 请求尝试从嵌入文件读取
         (Get, _) => {
-          // 静态文件回退
-          let target = resolve_path(p)
-          let mut found = false
-          for i = 0; i < emb_paths.length(); i = i + 1 {
-            if emb_paths[i] == target.to_owned() {
-              let bytes = try { @base64.decode(emb_data[i]) } catch { _ => break }
-              sconn.send_response(200, "OK", extra_headers={ "Content-Type": guess_type(emb_paths[i]) })
+          // 处理根路径和目录路径
+          let target = if p == "/" { "/index.html" } else { p.to_owned() }
+          match embedded.get(target) {
+            Some(bytes) => {
+              sconn.send_response(200, "OK",
+                extra_headers={ "Content-Type": @embed.content_type(target) })
               sconn.write(bytes)
               sconn.end_response()
-              found = true
-              break
             }
-          }
-          if !found {
-            sconn.send_response(404, "Not Found")
-            sconn.write_string("Not Found")
-            sconn.end_response()
+            None => {
+              sconn.send_response(404, "Not Found")
+              sconn.write_string("Not Found")
+              sconn.end_response()
+            }
           }
         }
         _ => {

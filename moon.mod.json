@@ -4,7 +4,8 @@
   "deps": {
     "moonbitlang/async": "0.19.2",
     "moonbit-community/sqlite3": "0.1.5",
-    "moonbitlang/x": "0.4.45"
+    "moonbitlang/x": "0.4.45",
+    "conglinyizhi/moon-embed": "0.1.2"
   },
   "repository": "https://github.com/conglinyizhi/prompts-server",
   "license": "AGPL-3.0",
