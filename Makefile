@@ -1,9 +1,30 @@
-.PHONY: dev backend frontend build build-backend build-frontend clean kill
+.PHONY: dev backend frontend build build-backend build-frontend install check clean nuke kill
 
 BACKEND_BIN  := _build/native/debug/build/prompts-server.exe
 FRONTEND_DIR := frontend
 
-# ── Dev: run both together ──────────────────────────────────
+# ── 安装依赖 ────────────────────────────────────────────────
+install:
+	@echo "[frontend] pnpm install"
+	@cd $(FRONTEND_DIR) && pnpm install
+
+# ── 代码检查 ────────────────────────────────────────────────
+check:
+	@echo "[backend] moon check"
+	@moon check --deny-warn --target native
+
+# ── 构建 ────────────────────────────────────────────────────
+build: check build-backend build-frontend
+
+build-backend:
+	@echo "[backend] moon build --target native"
+	@moon build --target native
+
+build-frontend: install
+	@echo "[frontend] pnpm build"
+	@cd $(FRONTEND_DIR) && pnpm build
+
+# ── 开发：同时启动前后端 ────────────────────────────────────
 dev: kill
 	@echo "=== Starting backend + frontend ==="
 	@trap 'kill 0' EXIT; \
@@ -11,14 +32,7 @@ dev: kill
 		$(MAKE) -s frontend & \
 		wait
 
-# ── Kill stale processes ────────────────────────────────────
-kill:
-	@echo "Cleaning up stale processes…"
-	@-lsof -ti:8080 2>/dev/null | xargs -r kill 2>/dev/null; true
-	@-lsof -ti:3000 2>/dev/null | xargs -r kill 2>/dev/null; true
-	@sleep 0.5
-
-# ── Individual ──────────────────────────────────────────────
+# ── 单独启动 ────────────────────────────────────────────────
 backend:
 	@echo "[backend] moon run . --target native"
 	@moon run . --target native
@@ -27,26 +41,28 @@ frontend:
 	@echo "[frontend] pnpm dev"
 	@cd $(FRONTEND_DIR) && pnpm dev
 
-# ── Build ───────────────────────────────────────────────────
-build: build-backend build-frontend
+# ── 清除残留进程 ────────────────────────────────────────────
+kill:
+	@echo "Cleaning up stale processes…"
+	@-lsof -ti:8080 2>/dev/null | xargs -r kill 2>/dev/null; true
+	@-lsof -ti:3000 2>/dev/null | xargs -r kill 2>/dev/null; true
+	@sleep 0.5
 
-build-backend:
-	@echo "[backend] moon build --target native"
-	@moon build --target native
-
-build-frontend:
-	@echo "[frontend] pnpm build"
-	@cd $(FRONTEND_DIR) && pnpm build
-
-# ── Clean (only build artifacts, NOT user data) ─────────────
+# ── 清理构建产物（不动数据） ─────────────────────────────────
 clean:
 	@echo "Cleaning build artifacts…"
 	@rm -rf _build
-	@cd $(FRONTEND_DIR) && rm -rf dist node_modules
+	@cd $(FRONTEND_DIR) && rm -rf dist
 	@echo "Done"
 
-# ── Nuke (everything including data) ───────────────────────
-nuke: clean
+# ── 清理全部（包括 node_modules） ───────────────────────────
+distclean: clean
+	@echo "Removing node_modules…"
+	@cd $(FRONTEND_DIR) && rm -rf node_modules
+	@echo "Done"
+
+# ── 核弹（连数据一起清） ────────────────────────────────────
+nuke: distclean
 	@echo "Removing user data…"
 	@rm -rf data
 	@echo "Done"
