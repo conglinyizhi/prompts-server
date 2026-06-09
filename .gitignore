@@ -5,3 +5,4 @@ target/
 .moonagent/
 .local/
 data/
+embedded.mbt

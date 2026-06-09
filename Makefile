@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend build build-backend build-frontend install check clean nuke kill
+.PHONY: dev backend frontend build build-backend build-frontend install check clean nuke kill embed
 
 BACKEND_BIN  := _build/native/debug/build/prompts-server.exe
 FRONTEND_DIR := frontend
@@ -8,21 +8,28 @@ install:
 	@echo "[frontend] pnpm install"
 	@cd $(FRONTEND_DIR) && pnpm install
 
-# ── 代码检查 ────────────────────────────────────────────────
-check:
+# ── 代码检查（依赖嵌入） ────────────────────────────────────
+check: embed
 	@echo "[backend] moon check"
 	@moon check --deny-warn --target native
 
 # ── 构建 ────────────────────────────────────────────────────
-build: check build-backend build-frontend
+build: embed build-backend
+
+# 构建前端并将产物嵌入后端
+build-frontend: install
+	@echo "[frontend] pnpm build"
+	@cd $(FRONTEND_DIR) && pnpm build
+	$(MAKE) -s embed
+
+# 将 frontend/dist/ 嵌入为 embedded.mbt
+embed:
+	@echo "[embed] Generating embedded.mbt…"
+	@bash scripts/embed.sh
 
 build-backend:
 	@echo "[backend] moon build --target native"
 	@moon build --target native
-
-build-frontend: install
-	@echo "[frontend] pnpm build"
-	@cd $(FRONTEND_DIR) && pnpm build
 
 # ── 开发：同时启动前后端 ────────────────────────────────────
 dev: kill
@@ -51,7 +58,7 @@ kill:
 # ── 清理构建产物（不动数据） ─────────────────────────────────
 clean:
 	@echo "Cleaning build artifacts…"
-	@rm -rf _build
+	@rm -rf _build dist
 	@cd $(FRONTEND_DIR) && rm -rf dist
 	@echo "Done"
 
