@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -13,6 +14,9 @@ jobs:
 
       - name: Install MoonBit
         run: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+
+      - name: Upgrade to latest toolchain
+        run: ~/.moon/bin/moon upgrade --force
 
       - name: Setup PATH
         run: echo "$HOME/.moon/bin" >> $GITHUB_PATH
@@ -49,11 +53,37 @@ jobs:
             echo ']'
           } > embedded.mbt
 
-      - name: Build backend
-        run: moon build --target native
+      - name: Build backend (release)
+        run: moon build --release
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: prompts-server
-          path: _build/native/debug/build/prompts-server.exe
+          path: _build/native/release/build/prompts-server.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: prompts-server
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            下载 `prompts-server.exe` 后直接运行：
+            ```bash
+            chmod +x prompts-server.exe
+            ./prompts-server.exe
+            ```
+          files: prompts-server.exe
